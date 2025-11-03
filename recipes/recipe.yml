@@ -1,45 +1,80 @@
 ---
 # yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
 # image will be published to ghcr.io/<user>/<name>
-name: uconsole-fedora-base
-# description will be included in the image's metadata
-description: This is my personal OS image.
+name: uconsole-fedora-sway
 
-# the base image to build on top of (FROM) and the version tag to use
-base-image: ghcr.io/ublue-os/silverblue-main
-image-version: 42 # latest is also supported if you want new updates ASAP
+description: A uConsole Atomic Fedora image with Sway WM, utilities, and more.
+
+#base-image: ghcr.io/ublue-os/base-main
+base-image: quay.io/fedora/fedora-bootc
+image-version: 42-aarch64 
 
 # module configuration, executed in order
 # you can include multiple instances of the same module
 modules:
-  - type: files
-    files:
-      - source: system
-        destination: / # copies files/system/* (* means everything inside it) into your image's root folder /
+  - type: bling
+    install:
+      - negativo17
 
   - type: dnf
-    repos:
-      copr:
-        - atim/starship
-    install:
-      packages:
-        - micro
-        - starship
     remove:
       packages:
-        # example: removing firefox (in favor of the flatpak)
-        # "firefox" is the main package, "firefox-langpacks" is a dependency
-        - firefox
-        - firefox-langpacks # also remove firefox dependency (not required for all packages, this is a special case)
+        - kernel
+        - kernel-core
+        - kernel-modules
+        - kernel-modules-core
+        - kernel-modules-extra
+  
+  - type: dnf
+    repos:
 
-  - type: default-flatpaks
-    configurations:
-      - notify: true # Send notification after install/uninstall is finished (true/false)
-        scope: system
-        # If no repo information is specified, Flathub will be used by default
-        install: # system flatpaks we want all users to have and not remove
-          - org.mozilla.firefox
-          - org.gnome.Loupe
-      - scope: user # Also add Flathub user repo, but no user packages
+    install:
+      allow-erasing: true
+      packages:
+        - clockworkpi-audio-1.1-2.noarch.rpm
 
-  - type: signing # this sets up the proper policy & signing files for signed images to work fully
+        - kernel-longterm-6.12.50-200.fc42.aarch64.rpm
+        - kernel-longterm-core-6.12.50-200.fc42.aarch64.rpm
+        - kernel-longterm-modules-6.12.50-200.fc42.aarch64.rpm
+        - kernel-longterm-modules-core-6.12.50-200.fc42.aarch64.rpm
+        - kernel-longterm-modules-extra-6.12.50-200.fc42.aarch64.rpm
+
+        # --- Fedora IOT specific packages ---
+        - fedora-release-iot
+        - fedora-iot-config
+        # - bcm2711-firmware
+        - uboot-tools
+        - uboot-images-armv8
+        - arm-image-installer
+        - libgpiod-utils
+        - mesa-dri-drivers
+
+        # -- Mobile packages ---
+        - tlp
+        - tlp-rdw
+
+  - type: script
+    scripts:
+      - "rm-firmware.sh"
+
+  - type: files
+    files:
+    - source: clockworkpi-cm-firmware_0.1_arm64/
+      destination: /boot/firmware
+    - source: uconsole-4g-util-cm4_0.2_arm64/etc/systemd/system/uconsole-4g-cm4.service
+      destination: /usr/lib/systemd/system/uconsole-4g-cm4.service
+    - source: uconsole-4g-util-cm4_0.2_arm64/usr/bin/uconsole-4g
+      destination: /usr/bin/uconsole-4g
+    - source: uconsole-4g-util-cm4_0.2_arm64/usr/local/bin/uconsole-4g-cm4
+      destination: /var/usrlocal/bin/uconsole-4g-cm4
+
+  - type: initramfs
+
+  - type: systemd
+    system:
+      enabled:
+        - clockworkpi-audio-patch.service
+        - clockworkpi-audio-shutdown.service
+        - uconsole-4g-cm4.service
+
+  - type: signing
